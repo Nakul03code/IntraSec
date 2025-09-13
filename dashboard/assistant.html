@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Intrasec AI Assistant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0d1117;
+            color: #e2e8f0;
+        }
+        .chat-container {
+            max-width: 768px;
+            margin: auto;
+            min-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            background-color: #161b22;
+        }
+        .message-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            opacity: 0;
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+        .user-message-row {
+            justify-content: flex-end;
+        }
+        .avatar {
+            width: 2.5rem;
+            height: 2.5rem;
+            border-radius: 50%;
+            background-color: #363c46;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            flex-shrink: 0;
+        }
+        .message-bubble {
+            max-width: 80%;
+            padding: 0.75rem 1.25rem;
+            border-radius: 1.5rem;
+            word-wrap: break-word;
+        }
+        .user-message-bubble {
+            background-color: #dc2626; /* A red color */
+            color: #ffffff;
+            border-bottom-right-radius: 0.5rem;
+        }
+        .bot-message-bubble {
+            background-color: #e2e8f0; /* A white/light color */
+            color: #1a202c;
+            border-bottom-left-radius: 0.5rem;
+        }
+        .prompt-button {
+            transition: all 0.2s ease-in-out;
+        }
+        .prompt-button:hover {
+            transform: scale(1.05);
+            background-color: #2c5282;
+            box-shadow: 0 4px 15px -5px rgba(44, 82, 130, 0.7);
+        }
+        #send-btn {
+            background-image: linear-gradient(135deg, #4c6888 0%, #3a5472 100%);
+            transition: all 0.2s ease-in-out;
+        }
+        #send-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        #user-input:focus {
+            box-shadow: 0 0 0 3px rgba(76, 104, 136, 0.5);
+        }
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div class="chat-container rounded-2xl shadow-xl flex flex-col p-6 h-[90vh] md:h-[80vh]">
+        <div id="chat-box" class="flex-grow overflow-y-auto pr-2">
+            <!-- Chat messages will be appended here -->
+        </div>
+
+        <div class="mt-4 flex flex-col items-center">
+            <div class="w-full flex justify-center flex-wrap gap-2 mb-4">
+                <button class="prompt-button bg-gray-700 text-sm md:text-base text-gray-200 px-4 py-2 rounded-full hover:bg-gray-600 transition-colors" onclick="sendMessage('What is Charlie\'s risk score?')">Charlie's Risk Score</button>
+                <button class="prompt-button bg-gray-700 text-sm md:text-base text-gray-200 px-4 py-2 rounded-full hover:bg-gray-600 transition-colors" onclick="sendMessage('Who are the high-risk users?')">High-Risk Users</button>
+                <button class="prompt-button bg-gray-700 text-sm md:text-base text-gray-200 px-4 py-2 rounded-full hover:bg-gray-600 transition-colors" onclick="sendMessage('Explain emotion risk.')">Explain Emotion Risk</button>
+                <button class="prompt-button bg-gray-700 text-sm md:text-base text-gray-200 px-4 py-2 rounded-full hover:bg-gray-600 transition-colors" onclick="sendMessage('Tell me about the anomaly detection model.')">Anomaly Detection</button>
+            </div>
+            <div class="flex w-full">
+                <input type="text" id="user-input" class="flex-grow px-4 py-3 bg-gray-700 rounded-full text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ask about users, risk scores, or anomalies...">
+                <button id="send-btn" class="ml-3 px-6 py-3 bg-blue-600 text-white rounded-full font-semibold hover:bg-blue-700 transition-colors shadow-lg">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const chatBox = document.getElementById('chat-box');
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+
+        // Simulated dataset based on your pipeline's output
+        const data = [
+            { user: "Alice", risk_persona: "Low Risk", anomaly: "Normal", emotion_risk: 0, location: "New York", message_sentiment_score: 0.85, explanation: "Normal behavior" },
+            { user: "Bob", risk_persona: "Medium Risk", anomaly: "Anomaly", emotion_risk: 0, location: "London", message_sentiment_score: 0.65, explanation: "Model flagged anomaly" },
+            { user: "Charlie", risk_persona: "High Risk", anomaly: "Anomaly", emotion_risk: 0.75, location: "Delhi", message_sentiment_score: 0.92, explanation: "High emotion, Model flagged anomaly" },
+            { user: "David", risk_persona: "High Risk", anomaly: "Anomaly", emotion_risk: 0.68, location: "Berlin", message_sentiment_score: "N/A", explanation: "High emotion, Model flagged anomaly, Unusual location" },
+            { user: "Eve", risk_persona: "Low Risk", anomaly: "Normal", emotion_risk: 0, location: "Tokyo", message_sentiment_score: 0.55, explanation: "Normal behavior, Unusual location" }
+        ];
+
+        // Add a message to the chat display with avatar and new styling
+        function addMessage(sender, message) {
+            const messageRow = document.createElement('div');
+            messageRow.className = `message-row ${sender === 'user' ? 'user-message-row' : ''}`;
+
+            const avatar = document.createElement('div');
+            avatar.className = 'avatar';
+            avatar.textContent = sender === 'user' ? '👤' : '🤖';
+
+            const messageBubble = document.createElement('div');
+            messageBubble.className = `message-bubble ${sender === 'user' ? 'user-message-bubble' : 'bot-message-bubble'}`;
+            
+            // Handle markdown-like formatting for bolding and newlines
+            const formattedMessage = message.replace(/\n\s*-\s*\*\*(.*?)\*\*: /g, '<br> • <strong>$1</strong>: ');
+            messageBubble.innerHTML = formattedMessage;
+
+            if (sender === 'user') {
+                messageRow.appendChild(messageBubble);
+                messageRow.appendChild(avatar);
+            } else {
+                messageRow.appendChild(avatar);
+                messageRow.appendChild(messageBubble);
+            }
+            
+            chatBox.appendChild(messageRow);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        // --- Core Chatbot Logic V4 - Rewritten for robustness ---
+
+        // A function to handle user-specific queries
+        function handleUserQuery(query) {
+            const lowerQuery = query.toLowerCase();
+            const userNames = data.map(u => u.user.toLowerCase());
+            const userMatch = userNames.find(name => lowerQuery.includes(name));
+
+            if (userMatch) {
+                const user = data.find(u => u.user.toLowerCase() === userMatch);
+                let response = `Based on User Risk Scores, ${user.user}'s current risk persona is "${user.risk_persona}".`;
+                
+                if (lowerQuery.includes('details') || lowerQuery.includes('score')) {
+                    if (user.anomaly === "Anomaly") {
+                        response += `\n- The user has been flagged as an Anomaly by the system.`;
+                    }
+                    response += `\n- Emotion Risk: ${user.emotion_risk > 0 ? 'High' : 'Normal'}.`;
+                    if (user.message_sentiment_score !== "N/A") {
+                        response += `\n- Message Sentiment Score: ${user.message_sentiment_score.toFixed(2)}.`;
+                    }
+                    if (user.explanation.includes("Unusual location")) {
+                        response += `\n- Location Risk: They were active from ${user.location}, which is an unusual location.`;
+                    }
+                }
+                return response;
+            }
+            return null;
+        }
+
+        // A function to handle general system queries from the knowledge base
+        function handleSystemQuery(query) {
+            const lowerQuery = query.toLowerCase();
+            const knowledgeBase = [
+                {
+                    keywords: ['high-risk', 'risky users', 'alert', 'alerts', 'whos high-risk'],
+                    response: (query) => {
+                        const highRiskUsers = data.filter(u => u.risk_persona === 'High Risk');
+                        if (highRiskUsers.length > 0) {
+                            const userList = highRiskUsers.map(u => u.user).join(', ');
+                            return `Based on User Risk Scores, the following users are currently flagged as High Risk: ${userList}. For more details, you can check the Alerts tab in the main dashboard, which is handled by the \`combined_dashboard.py\` script.`;
+                        } else {
+                            return "Based on User Risk Scores, there are no users currently flagged as High Risk. The system is operating normally.";
+                        }
+                    }
+                },
+                {
+                    keywords: ['anomaly', 'anomoly', 'anomalies', 'model', 'machine learning', 'ml', 'ai', 'explain anomaly detection'],
+                    response: (query) => {
+                        const anomalies = data.filter(u => u.anomaly === 'Anomaly');
+                        const userList = anomalies.length > 0 ? anomalies.map(u => u.user).join(', ') : 'no users';
+                        return `The Anomaly Detection model has flagged the following users as exhibiting anomalous behavior: ${userList}. This model, an Isolation Forest algorithm trained in the \`train.py\` script, analyzes a combination of Emotion Risk, Influence Score, and Message Sentiment to detect deviations from a normal user baseline. This is a core part of our machine learning pipeline.`;
+                    }
+                },
+                {
+                    keywords: ['emotion risk', 'emotion', 'emotional', 'explain emotion risk'],
+                    response: (query) => "The Emotion Risk metric is derived from a user's emotional score, a key part of our NLP analysis pipeline. A high score indicates an elevated risk profile, especially when combined with other behavioral indicators. The \`emotion_analysis.py\` script applies a threshold to a user's emotional score to calculate this risk. In the simulated data, users like Charlie and David currently have a high Emotion Risk score."
+                },
+                {
+                    keywords: ['sentiment', 'nlp', 'natural language processing', 'explain sentiment'],
+                    response: (query) => "Our system uses an NLP Sentiment Analysis model to evaluate the tone of user messages. This is handled by the \`nlp_analysis.py\` script, which applies a pre-trained sentiment analysis pipeline to extract sentiment scores and labels from message logs. This is a critical feature for identifying unusual communication patterns that could indicate a threat."
+                },
+                {
+                    keywords: ['location risk', 'location', 'geography', 'city', 'explain location risk'],
+                    response: (query) => {
+                        const highLocationRisk = data.filter(u => u.explanation.includes('Unusual location'));
+                        if (highLocationRisk.length > 0) {
+                            const userList = highLocationRisk.map(u => `${u.user} (${u.location})`).join(', ');
+                            return `Based on Location Risk, the following users are flagged for operating from an unusual location: ${userList}. The system compares user locations to a list of allowed cities, as defined in the \`location_analysis.py\` file, to detect potential unauthorized access or compromised accounts.`;
+                        } else {
+                            return "There are no users currently flagged for Location Risk. All detected user locations are within the normal operating parameters.";
+                        }
+                    }
+                },
+                {
+                    keywords: ['risk is determined', 'how is risk calculated', 'risk score', 'risk persona'],
+                    response: (query) => "A user's Risk Persona is calculated based on multiple factors. The primary indicator is whether the Anomaly Detection model has flagged them. If so, their Emotion Risk is further analyzed to classify them as 'High' or 'Medium' risk. Other factors like unusual locations also contribute to the final assessment. This comprehensive logic is defined in the \`combined_dashboard.py\` file, which aggregates all the features to assign a risk score."
+                },
+                {
+                    keywords: ['collusion', 'graph', 'communication', 'social', 'collusion analysis'],
+                    response: (query) => "Collusion and communication are analyzed by building a graph of user interactions, as handled by the \`graph_analysis.py\` script. This visualization helps security analysts identify social links and suspicious networks within the organization based on influence scores, providing a visual representation of potential insider threats. This helps in understanding how users are interconnected."
+                },
+                {
+                    keywords: ['pipeline', 'system', 'workflow', 'process'],
+                    response: (query) => "The entire data processing workflow is managed by the \`pipeline.py\` script. It orchestrates a series of steps in a specific order: log simulation, emotion analysis, NLP sentiment analysis, feature merging, location processing, and model training. This ensures a consistent and automated flow from raw data to actionable insights on the dashboard."
+                },
+                {
+                    keywords: ['data', 'logs', 'what data'],
+                    response: (query) => "The data is initially simulated using the \`simulate_logs.py\` script, which generates user logs with attributes like messages, emotion scores, and locations. This raw data is then enriched and analyzed by the subsequent scripts in the pipeline to generate the insights you see in the dashboard."
+                },
+                {
+                    keywords: ['train', 'training', 'training model'],
+                    response: (query) => "The \`train.py\` script is responsible for training the Isolation Forest model, which is our core Anomaly Detection model. It uses the processed features, including emotion, influence, and sentiment scores, to learn the normal behavior of users and identify significant deviations that could indicate a threat."
+                },
+                {
+                    keywords: ['features', 'merge', 'merging'],
+                    response: (query) => "The \`merge_features.py\` script is a critical step in the pipeline. It combines all the processed data, such as emotion scores from \`emotion_analysis.py\`, sentiment scores from \`nlp_analysis.py\`, and location data from \`location_analysis.py\`, into a single, unified dataset. This integrated data is then used to train the final risk models."
+                }
+            ];
+
+            const foundMatch = knowledgeBase.find(item => item.keywords.some(keyword => lowerQuery.includes(keyword)));
+            return foundMatch ? foundMatch.response(query) : null;
+        }
+
+        // Handle the entire query flow
+        function getResponse(query) {
+            const initialResponse = "I'm sorry, I couldn't find an answer to that specific question. I can answer queries related to User Risk Scores, Anomaly Detection, Emotion Risk, Location Risk, Sentiment Analysis, Collusion, and the overall system pipeline.";
+
+            // Try user-specific query first
+            const userResponse = handleUserQuery(query);
+            if (userResponse) {
+                return userResponse;
+            }
+
+            // Fallback to system-wide knowledge base
+            const systemResponse = handleSystemQuery(query);
+            if (systemResponse) {
+                return systemResponse;
+            }
+
+            // Final fallback
+            return initialResponse;
+        }
+
+        // Handle sending a message from the input field or quick-prompt buttons
+        function sendMessage(message) {
+            const query = message || userInput.value.trim();
+            if (query === '') return;
+
+            addMessage('user', query);
+            userInput.value = '';
+
+            // Simulate chatbot response after a short delay
+            setTimeout(() => {
+                const response = getResponse(query);
+                addMessage('bot', response);
+            }, 750);
+        }
+
+        // Attach event listeners
+        sendBtn.addEventListener('click', () => sendMessage());
+        userInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+        
+        // Initial welcome message from the bot
+        window.onload = () => {
+             addMessage('bot', 'Hello! I am the Intrasec AI Assistant. I can provide insights into user risk scores, anomalies, and other metrics. What would you like to know?');
+        };
+
+    </script>
+</body>
+</html>
